@@ -200,9 +200,24 @@ async function init() {
     renderTagList('customExcludesList', currentConfig.customExcludes, removeExclude);
 
     updateStatusBanner();
+    updateActiveTargetsCount();
   } catch (error) {
     console.error('Failed to initialize popup:', error);
   }
+}
+
+/**
+ * Updates the active targets count indicator in the collapsed accordion.
+ */
+function updateActiveTargetsCount() {
+  const countEl = document.getElementById('activeTargetsCount');
+  if (!countEl) return;
+  const presets = ['presetGoogle', 'presetGemini', 'presetClaude', 'presetOpenAI', 'presetGoogleStitch'];
+  const count = presets.filter(id => {
+    const el = document.getElementById(id);
+    return el ? el.checked : (currentConfig[id] !== false);
+  }).length;
+  countEl.textContent = `${count}/5 active`;
 }
 
 /**
@@ -217,22 +232,27 @@ function setupListeners() {
   // Target presets
   safeListen('presetGoogle', 'change', async (e) => {
     await saveConfig({ presetGoogle: e.target.checked });
+    updateActiveTargetsCount();
   });
 
   safeListen('presetGemini', 'change', async (e) => {
     await saveConfig({ presetGemini: e.target.checked });
+    updateActiveTargetsCount();
   });
 
   safeListen('presetClaude', 'change', async (e) => {
     await saveConfig({ presetClaude: e.target.checked });
+    updateActiveTargetsCount();
   });
 
   safeListen('presetOpenAI', 'change', async (e) => {
     await saveConfig({ presetOpenAI: e.target.checked });
+    updateActiveTargetsCount();
   });
 
   safeListen('presetGoogleStitch', 'change', async (e) => {
     await saveConfig({ presetGoogleStitch: e.target.checked });
+    updateActiveTargetsCount();
   });
 
   safeListen('fallbackToDirect', 'change', async (e) => {

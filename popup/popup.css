@@ -1,27 +1,30 @@
-/* Dark Monolith UI System */
+/* Dark Monolith UI System - Glass Acrylic Mode */
 
 :root {
-  /* Surfaces */
-  --bg-app:       #121212;
-  --bg-surface:   #121212;
-  --bg-surface-2: #1c1c1c;
-  --bg-surface-3: #161616;
+  /* Surfaces with Frosted Glass Alpha */
+  --bg-app:        #0d0d0d;
+  --bg-glass-card: rgba(26, 26, 26, 0.70);
+  --bg-glass-sub:  rgba(18, 18, 18, 0.80);
+  --bg-glass-row:  rgba(24, 24, 24, 0.60);
+  --bg-input:      rgba(15, 15, 15, 0.85);
 
   /* Accent & Typography */
-  --accent:       #FFFFFF;
-  --accent-fg:    #000000;
-  --text-primary: #E0E0E0;
-  --text-sec:     #888888;
+  --accent:        #FFFFFF;
+  --accent-fg:     #000000;
+  --text-primary:  #E0E0E0;
+  --text-sec:      #888888;
 
   /* Borders & Shadows */
-  --border:       rgba(255, 255, 255, 0.08);
-  --border-hover: rgba(255, 255, 255, 0.16);
-  --shadow:       0 4px 12px rgba(0, 0, 0, 0.5);
-  --shadow-lg:    0 8px 24px rgba(0, 0, 0, 0.65);
+  --border:        rgba(255, 255, 255, 0.08);
+  --border-hover:  rgba(255, 255, 255, 0.16);
+  --shadow:        0 8px 24px rgba(0, 0, 0, 0.65);
+
+  /* Glass Blur Tokens */
+  --glass-blur:    blur(16px) saturate(140%);
 
   /* Fonts */
-  --font-sans:    'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-mono:    'JetBrains Mono', 'Fira Code', monospace;
+  --font-sans:     'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono:     'JetBrains Mono', 'Fira Code', monospace;
 
   /* Radii & Motion */
   --r-sm: 6px;
@@ -40,6 +43,9 @@ body {
   width: 350px;
   font-family: var(--font-sans);
   background-color: var(--bg-app);
+  background-image: 
+    radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.05) 0%, transparent 65%),
+    radial-gradient(circle at 100% 100%, rgba(255, 255, 255, 0.02) 0%, transparent 50%);
   color: var(--text-primary);
   margin: 0;
   padding: 0;
@@ -50,11 +56,10 @@ body {
 }
 
 .app-container {
-  padding: 16px;
+  padding: 14px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  background-color: var(--bg-app);
+  gap: 10px;
 }
 
 /* Header */
@@ -121,10 +126,12 @@ body {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: var(--bg-surface-2);
+  background-color: rgba(35, 35, 35, 0.8);
   border: 1px solid var(--border);
   border-radius: 24px;
   transition: var(--t);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
 }
 
 .switch-slider:before {
@@ -149,15 +156,17 @@ input:checked + .switch-slider:before {
   background-color: var(--accent-fg);
 }
 
-/* Status Card - Flat Monolith Pill */
+/* Status Card - Flat Glass Monolith Pill */
 .status-card {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 12px;
+  padding: 9px 12px;
   border-radius: var(--r-md);
   border: 1px solid var(--border);
-  background-color: var(--bg-surface-2);
+  background: var(--bg-glass-card);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   transition: var(--t);
 }
 
@@ -195,7 +204,7 @@ input:checked + .switch-slider:before {
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--text-sec);
-  background: var(--bg-surface-3);
+  background: var(--bg-input);
   padding: 3px 8px;
   border-radius: var(--r-sm);
   border: 1px solid var(--border);
@@ -218,7 +227,9 @@ input:checked + .switch-slider:before {
   justify-content: center;
   gap: 4px;
   text-decoration: none;
-  background-color: var(--bg-surface-2);
+  background: var(--bg-glass-card);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border: 1px solid var(--border);
   color: var(--text-sec);
   padding: 6px 4px;
@@ -229,108 +240,18 @@ input:checked + .switch-slider:before {
 }
 
 .nav-item:hover {
-  background-color: var(--bg-surface-3);
+  background: var(--bg-glass-sub);
   border-color: var(--border-hover);
   color: var(--text-primary);
 }
 
-/* Services Section */
-.section {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.section-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.section-title {
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 1px;
-  color: var(--text-sec);
-  font-family: var(--font-mono);
-}
-
-.service-stack {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.service-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 9px 12px;
-  background-color: var(--bg-surface-2);
-  border: 1px solid var(--border);
-  border-radius: var(--r-md);
-  cursor: pointer;
-  transition: var(--t);
-}
-
-.service-row:hover {
-  background-color: var(--bg-surface-3);
-  border-color: var(--border-hover);
-}
-
-.service-meta {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.service-icon {
-  width: 26px;
-  height: 26px;
-  border-radius: var(--r-sm);
-  background-color: var(--bg-surface-3);
-  border: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-sec);
-  transition: var(--t);
-}
-
-.service-row:hover .service-icon {
-  color: var(--text-primary);
-}
-
-.service-text {
-  display: flex;
-  flex-direction: column;
-}
-
-.service-title {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text-primary);
-}
-
-.service-details {
-  font-size: 10px;
-  color: var(--text-sec);
-  font-family: var(--font-mono);
-}
-
-/* Checkbox */
-.control-checkbox {
-  width: 16px;
-  height: 16px;
-  cursor: pointer;
-  accent-color: var(--accent);
-}
-
-/* Accordion */
+/* Accordions (Collapsible Folders) */
 .monolith-accordion {
   border: 1px solid var(--border);
   border-radius: var(--r-md);
-  background-color: var(--bg-surface-2);
+  background: var(--bg-glass-card);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   overflow: hidden;
   transition: var(--t);
 }
@@ -363,6 +284,22 @@ input:checked + .switch-slider:before {
   gap: 8px;
 }
 
+.summary-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.count-pill {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--text-sec);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 2px 6px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border);
+}
+
 .chevron {
   transition: transform 0.2s ease;
 }
@@ -372,19 +309,93 @@ input:checked + .switch-slider:before {
 }
 
 .accordion-body {
-  padding: 12px;
+  padding: 10px 12px;
   border-top: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  background-color: var(--bg-surface-3);
+  gap: 10px;
+  background: var(--bg-glass-sub);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+}
+
+/* Service Stack inside accordion */
+.service-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.service-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 10px;
+  background: var(--bg-glass-row);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  cursor: pointer;
+  transition: var(--t);
+}
+
+.service-row:hover {
+  background: rgba(36, 36, 36, 0.7);
+  border-color: var(--border-hover);
+}
+
+.service-meta {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.service-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--r-sm);
+  background-color: rgba(18, 18, 18, 0.8);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-sec);
+  transition: var(--t);
+  flex-shrink: 0;
+}
+
+.service-row:hover .service-icon {
+  color: var(--text-primary);
+}
+
+.service-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.service-title {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.service-details {
+  font-size: 10px;
+  color: var(--text-sec);
+  font-family: var(--font-mono);
+}
+
+.control-checkbox {
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+  accent-color: var(--accent);
 }
 
 /* Form Fields */
 .field-group {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 5px;
 }
 
 .field-label {
@@ -410,10 +421,10 @@ input:checked + .switch-slider:before {
 
 .mono-input {
   flex: 1;
-  background-color: var(--bg-surface);
+  background-color: var(--bg-input);
   border: 1px solid var(--border);
   border-radius: var(--r-sm);
-  padding: 7px 10px;
+  padding: 6px 9px;
   color: var(--text-primary);
   font-family: var(--font-mono);
   font-size: 12px;
@@ -468,7 +479,7 @@ input:checked + .switch-slider:before {
   color: var(--text-primary);
   border: 1px solid var(--border);
   border-radius: var(--r-md);
-  padding: 8px 12px;
+  padding: 7px 12px;
   font-size: 11px;
   font-weight: 500;
   font-family: var(--font-mono);
@@ -478,7 +489,7 @@ input:checked + .switch-slider:before {
 
 .btn-secondary:hover {
   border-color: var(--border-hover);
-  background-color: var(--bg-surface-2);
+  background-color: rgba(35, 35, 35, 0.6);
 }
 
 /* Tag Chips */
@@ -486,14 +497,14 @@ input:checked + .switch-slider:before {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
-  min-height: 20px;
+  min-height: 18px;
 }
 
 .chip-item {
   display: flex;
   align-items: center;
   gap: 6px;
-  background-color: var(--bg-surface-2);
+  background-color: rgba(32, 32, 32, 0.7);
   border: 1px solid var(--border);
   color: var(--text-primary);
   padding: 2px 7px;
@@ -523,7 +534,9 @@ input:checked + .switch-slider:before {
   bottom: 12px;
   left: 50%;
   transform: translateX(-50%);
-  background-color: var(--bg-surface-2);
+  background-color: rgba(26, 26, 26, 0.95);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border: 1px solid var(--border-hover);
   color: var(--text-primary);
   padding: 6px 14px;
