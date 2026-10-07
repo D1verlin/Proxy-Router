@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Smart Proxy: AI & Google",
-  "version": "1.0.3",
+  "version": "1.0.5",
   "description": "Перенаправление трафика Google (кроме YouTube), Gemini, Claude, OpenAI и Google Stitch через HTTP прокси.",
   "icons": {
     "16": "icons/icon16.png",
@@ -25,6 +25,8 @@
     "storage"
   ],
   "host_permissions": [
-    "https://*.google.com/*"
+    "*://api.ipify.org/*",
+    "*://ipinfo.io/*",
+    "*://*.google.com/*"
   ]
 }

@@ -45,7 +45,10 @@ function generatePacScript(config) {
   }
 
   // 2. Target domains to route through proxy
-  const targetList = [];
+  const targetList = [
+    'api.ipify.org',
+    'ipinfo.io'
+  ];
 
   // OpenAI / ChatGPT
   if (config.presetOpenAI) {
@@ -209,7 +212,8 @@ async function applyProxySettings() {
 }
 
 /**
- * Performs a health check by pinging Google 204 endpoint through the configured proxy.
+ * Performs a health and whitelist check by verifying outbound IP through an endpoint
+ * that is explicitly routed through the proxy in the PAC script.
  */
 async function checkProxyHealth() {
   const config = await getConfig();
@@ -219,58 +223,87 @@ async function checkProxyHealth() {
     return res;
   }
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 4000);
+  const expectedIp = (config.proxyHost || '2.27.25.190').trim();
 
-  try {
-    const resp = await fetch('https://www.google.com/generate_204', {
-      method: 'GET',
-      signal: controller.signal,
-      cache: 'no-store'
-    });
-    clearTimeout(timer);
+  // Helper function to query an IP echo service
+  async function queryIpEcho(url, timeoutMs = 4500) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const resp = await fetch(url, {
+        method: 'GET',
+        signal: controller.signal,
+        cache: 'no-store'
+      });
+      clearTimeout(timer);
+      if (!resp.ok) {
+        return { ok: false, error: `HTTP ${resp.status}`, status: resp.status };
+      }
+      const data = await resp.json();
+      const ip = (data && data.ip ? data.ip : '').trim();
+      return { ok: true, ip };
+    } catch (err) {
+      clearTimeout(timer);
+      const isTimeout = err.name === 'AbortError';
+      return { ok: false, error: isTimeout ? 'Timeout' : (err.message || 'Network Error') };
+    }
+  }
 
-    if (resp.status === 204 || resp.status === 200) {
-      const result = { status: 'active', timestamp: Date.now() };
+  const cacheBust = Date.now();
+  // 1. Primary probe: api.ipify.org (routed strictly via proxy in PAC script)
+  let probe = await queryIpEcho(`https://api.ipify.org?format=json&_ts=${cacheBust}`, 4500);
+
+  // 2. Fallback probe: ipinfo.io (if primary encountered network error/timeout, but not 403/407)
+  if (!probe.ok && probe.error !== 'HTTP 403' && probe.error !== 'HTTP 407') {
+    probe = await queryIpEcho(`https://ipinfo.io/json?_ts=${cacheBust}`, 4500);
+  }
+
+  if (probe.ok && probe.ip) {
+    // If observed IP matches proxy IP, traffic is confirmed routed through proxy
+    if (probe.ip === expectedIp || probe.ip.startsWith(expectedIp)) {
+      const result = {
+        status: 'active',
+        ip: probe.ip,
+        timestamp: Date.now()
+      };
       await chrome.storage.local.set({ proxyHealth: result });
       await chrome.action.setBadgeText({ text: 'ON' });
       await chrome.action.setBadgeBackgroundColor({ color: '#222222' });
       await chrome.action.setTitle({
-        title: `Proxy Router: Active (${config.proxyHost}:${config.proxyPort})`
+        title: `Proxy Router: Active (${expectedIp}:${config.proxyPort})`
       });
       return result;
     } else {
+      // Egress IP does not match the proxy! Proxy was bypassed or fell back to direct.
       const result = {
         status: 'blocked',
-        reason: 'HTTP ' + resp.status,
-        statusCode: resp.status,
+        reason: `Direct connection detected (${probe.ip})`,
+        observedIp: probe.ip,
         timestamp: Date.now()
       };
       await chrome.storage.local.set({ proxyHealth: result });
       await chrome.action.setBadgeText({ text: 'ERR' });
       await chrome.action.setBadgeBackgroundColor({ color: '#552222' });
       await chrome.action.setTitle({
-        title: `Proxy Router: Access Restricted (${resp.status})`
+        title: 'Proxy Router: IP Not Whitelisted'
       });
       return result;
     }
-  } catch (err) {
-    clearTimeout(timer);
-    const isTimeout = err.name === 'AbortError';
-    const result = {
-      status: 'blocked',
-      reason: isTimeout ? 'Connection Timeout' : 'Network Error',
-      error: err.message,
-      timestamp: Date.now()
-    };
-    await chrome.storage.local.set({ proxyHealth: result });
-    await chrome.action.setBadgeText({ text: 'ERR' });
-    await chrome.action.setBadgeBackgroundColor({ color: '#552222' });
-    await chrome.action.setTitle({
-      title: 'Proxy Router: Connection Failed / Whitelist Required'
-    });
-    return result;
   }
+
+  // Probe failed (Squid 403 Forbidden, 407 Auth Required, tunnel connection refused, or timeout)
+  const result = {
+    status: 'blocked',
+    reason: probe.error || 'Connection Failed',
+    timestamp: Date.now()
+  };
+  await chrome.storage.local.set({ proxyHealth: result });
+  await chrome.action.setBadgeText({ text: 'ERR' });
+  await chrome.action.setBadgeBackgroundColor({ color: '#552222' });
+  await chrome.action.setTitle({
+    title: 'Proxy Router: Connection Blocked / Whitelist Required'
+  });
+  return result;
 }
 
 // Extension installation or update
@@ -321,6 +354,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         const stored = await chrome.storage.local.get('proxyHealth');
         sendResponse({ success: true, config, proxyHealth: stored.proxyHealth });
       } else if (message.action === 'checkHealth') {
+        if (message.forceReapply) {
+          await applyProxySettings();
+        }
         const health = await checkProxyHealth();
         sendResponse({ success: true, health });
       } else if (message.action === 'toggleProxy') {

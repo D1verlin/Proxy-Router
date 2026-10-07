@@ -117,36 +117,55 @@ function updateStatusBanner(health = null) {
     statusBanner.className = 'status-card status-checking';
     if (statusText) statusText.textContent = 'CHECKING...';
     if (proxyServerDisplay) proxyServerDisplay.textContent = `${host}:${port}`;
-    if (whitelistCard) whitelistCard.classList.add('hidden');
-  } else {
+    // Preserve whitelistCard visibility during check to prevent jumpy UI
+  } else if (currentHealth && currentHealth.status === 'active') {
     statusBanner.className = 'status-card status-active';
     if (statusText) statusText.textContent = 'ACTIVE';
     if (proxyServerDisplay) proxyServerDisplay.textContent = `${host}:${port}`;
     if (whitelistCard) whitelistCard.classList.add('hidden');
+  } else {
+    statusBanner.className = 'status-card status-checking';
+    if (statusText) statusText.textContent = 'CHECKING...';
+    if (proxyServerDisplay) proxyServerDisplay.textContent = `${host}:${port}`;
   }
 }
 
 /**
  * Triggers a live proxy connectivity and whitelist check.
  */
-async function performHealthCheck() {
+async function performHealthCheck(manual = false) {
   if (!currentConfig.enabled) {
     updateStatusBanner({ status: 'disabled' });
     return;
   }
 
-  updateStatusBanner({ status: 'checking' });
+  if (manual) {
+    updateStatusBanner({ status: 'checking' });
+  }
+
   try {
-    const resp = await chrome.runtime.sendMessage({ action: 'checkHealth' });
+    const resp = await chrome.runtime.sendMessage({
+      action: 'checkHealth',
+      forceReapply: manual
+    });
     if (resp && resp.health) {
       currentConfig.proxyHealth = resp.health;
       updateStatusBanner(resp.health);
+      if (manual) {
+        if (resp.health.status === 'active') {
+          showToast('Proxy active');
+        } else {
+          showToast('Not in whitelist');
+        }
+      }
     } else {
-      updateStatusBanner({ status: 'active' });
+      updateStatusBanner({ status: 'blocked', reason: 'No response' });
+      if (manual) showToast('Check failed');
     }
   } catch (err) {
     console.warn('Health check communication error:', err);
     updateStatusBanner({ status: 'blocked', error: err.message });
+    if (manual) showToast('Connection error');
   }
 }
 
@@ -283,8 +302,14 @@ function setupListeners() {
 
   // Recheck button
   safeListen('recheckBtn', 'click', async () => {
+    const recheckBtn = document.getElementById('recheckBtn');
+    if (recheckBtn) recheckBtn.disabled = true;
     showToast('Checking connection...');
-    await performHealthCheck();
+    try {
+      await performHealthCheck(true);
+    } finally {
+      if (recheckBtn) recheckBtn.disabled = false;
+    }
   });
 
   // Target presets
@@ -393,6 +418,17 @@ function setupListeners() {
     await saveConfig({ ...DEFAULT_CONFIG });
     await init();
     showToast('Reset to defaults');
+  });
+
+  // Open external links reliably in Chrome tabs
+  document.querySelectorAll('a[href]').forEach(link => {
+    link.addEventListener('click', (e) => {
+      e.preventDefault();
+      const url = link.getAttribute('href');
+      if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
+        chrome.tabs.create({ url });
+      }
+    });
   });
 }
 
