@@ -251,11 +251,21 @@ async function checkProxyHealth() {
 
   const cacheBust = Date.now();
   // 1. Primary probe: api.ipify.org (routed strictly via proxy in PAC script)
-  let probe = await queryIpEcho(`https://api.ipify.org?format=json&_ts=${cacheBust}`, 4500);
+  let probe = await queryIpEcho(`https://api.ipify.org?format=json&_ts=${cacheBust}`, 4000);
+
+  // Check if onAuthRequired or onProxyError flagged proxy as blocked during probe
+  const stored = await chrome.storage.local.get('proxyHealth');
+  if (stored.proxyHealth && stored.proxyHealth.status === 'blocked') {
+    return stored.proxyHealth;
+  }
 
   // 2. Fallback probe: ipinfo.io (if primary encountered network error/timeout, but not 403/407)
   if (!probe.ok && probe.error !== 'HTTP 403' && probe.error !== 'HTTP 407') {
-    probe = await queryIpEcho(`https://ipinfo.io/json?_ts=${cacheBust}`, 4500);
+    probe = await queryIpEcho(`https://ipinfo.io/json?_ts=${cacheBust}`, 4000);
+    const storedAfter = await chrome.storage.local.get('proxyHealth');
+    if (storedAfter.proxyHealth && storedAfter.proxyHealth.status === 'blocked') {
+      return storedAfter.proxyHealth;
+    }
   }
 
   if (probe.ok && probe.ip) {
@@ -331,6 +341,33 @@ chrome.storage.onChanged.addListener(async (changes, areaName) => {
     }
   }
 });
+
+// Intercept proxy authentication challenges (HTTP 407).
+// When client IP is not in whitelist, Squid proxy asks for credentials.
+// We silently cancel the native browser login prompt and instantly flag proxy as blocked.
+chrome.webRequest.onAuthRequired.addListener(
+  (details) => {
+    if (details.isProxy) {
+      console.warn('Smart Proxy: Auth challenge detected (IP not in whitelist):', details);
+      const result = {
+        status: 'blocked',
+        reason: 'Proxy Authentication Required (407)',
+        timestamp: Date.now()
+      };
+      chrome.storage.local.set({ proxyHealth: result });
+      chrome.action.setBadgeText({ text: 'ERR' });
+      chrome.action.setBadgeBackgroundColor({ color: '#552222' });
+      chrome.action.setTitle({
+        title: 'Proxy Router: IP Not Whitelisted'
+      });
+
+      // Cancel challenge to completely suppress Chrome's login/password prompt!
+      return { cancel: true };
+    }
+  },
+  { urls: ['<all_urls>'] },
+  ['blocking']
+);
 
 // Listen for proxy errors
 chrome.proxy.onProxyError.addListener(async (details) => {

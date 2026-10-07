@@ -430,6 +430,14 @@ function setupListeners() {
       }
     });
   });
+
+  // Real-time synchronization of proxy health state from background worker
+  chrome.storage.onChanged.addListener((changes, areaName) => {
+    if (areaName === 'local' && changes.proxyHealth) {
+      currentConfig.proxyHealth = changes.proxyHealth.newValue;
+      updateStatusBanner(changes.proxyHealth.newValue);
+    }
+  });
 }
 
 // Bootstrap
