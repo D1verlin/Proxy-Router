@@ -184,6 +184,9 @@ async function applyProxySettings() {
         title: `Proxy Router: Active (${config.proxyHost}:${config.proxyPort})`
       });
       console.log('Smart Proxy: PAC script successfully applied.');
+      
+      // Perform health check asynchronously
+      checkProxyHealth();
     } else {
       // Revert to system default proxy
       await chrome.proxy.settings.set({
@@ -197,10 +200,76 @@ async function applyProxySettings() {
       await chrome.action.setTitle({
         title: 'Proxy Router: Disabled (direct connection)'
       });
+      await chrome.storage.local.set({ proxyHealth: { status: 'disabled', timestamp: Date.now() } });
       console.log('Smart Proxy: Proxy disabled, returned to system mode.');
     }
   } catch (error) {
     console.error('Smart Proxy: Failed to update proxy settings:', error);
+  }
+}
+
+/**
+ * Performs a health check by pinging Google 204 endpoint through the configured proxy.
+ */
+async function checkProxyHealth() {
+  const config = await getConfig();
+  if (!config.enabled) {
+    const res = { status: 'disabled', timestamp: Date.now() };
+    await chrome.storage.local.set({ proxyHealth: res });
+    return res;
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 4000);
+
+  try {
+    const resp = await fetch('https://www.google.com/generate_204', {
+      method: 'GET',
+      signal: controller.signal,
+      cache: 'no-store'
+    });
+    clearTimeout(timer);
+
+    if (resp.status === 204 || resp.status === 200) {
+      const result = { status: 'active', timestamp: Date.now() };
+      await chrome.storage.local.set({ proxyHealth: result });
+      await chrome.action.setBadgeText({ text: 'ON' });
+      await chrome.action.setBadgeBackgroundColor({ color: '#222222' });
+      await chrome.action.setTitle({
+        title: `Proxy Router: Active (${config.proxyHost}:${config.proxyPort})`
+      });
+      return result;
+    } else {
+      const result = {
+        status: 'blocked',
+        reason: 'HTTP ' + resp.status,
+        statusCode: resp.status,
+        timestamp: Date.now()
+      };
+      await chrome.storage.local.set({ proxyHealth: result });
+      await chrome.action.setBadgeText({ text: 'ERR' });
+      await chrome.action.setBadgeBackgroundColor({ color: '#552222' });
+      await chrome.action.setTitle({
+        title: `Proxy Router: Access Restricted (${resp.status})`
+      });
+      return result;
+    }
+  } catch (err) {
+    clearTimeout(timer);
+    const isTimeout = err.name === 'AbortError';
+    const result = {
+      status: 'blocked',
+      reason: isTimeout ? 'Connection Timeout' : 'Network Error',
+      error: err.message,
+      timestamp: Date.now()
+    };
+    await chrome.storage.local.set({ proxyHealth: result });
+    await chrome.action.setBadgeText({ text: 'ERR' });
+    await chrome.action.setBadgeBackgroundColor({ color: '#552222' });
+    await chrome.action.setTitle({
+      title: 'Proxy Router: Connection Failed / Whitelist Required'
+    });
+    return result;
   }
 }
 
@@ -222,13 +291,25 @@ chrome.runtime.onStartup.addListener(async () => {
 // Watch for storage changes and automatically apply new PAC script
 chrome.storage.onChanged.addListener(async (changes, areaName) => {
   if (areaName === 'local') {
-    await applyProxySettings();
+    // Only re-apply if configuration keys changed, not proxyHealth
+    const keys = Object.keys(changes);
+    if (keys.some(k => k !== 'proxyHealth')) {
+      await applyProxySettings();
+    }
   }
 });
 
 // Listen for proxy errors
-chrome.proxy.onProxyError.addListener((details) => {
+chrome.proxy.onProxyError.addListener(async (details) => {
   console.warn('Smart Proxy onProxyError:', details);
+  const result = {
+    status: 'blocked',
+    reason: details.error || 'Proxy Error',
+    timestamp: Date.now()
+  };
+  await chrome.storage.local.set({ proxyHealth: result });
+  await chrome.action.setBadgeText({ text: 'ERR' });
+  await chrome.action.setBadgeBackgroundColor({ color: '#552222' });
 });
 
 // Handle messages from popup UI
@@ -237,7 +318,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     try {
       if (message.action === 'getConfig') {
         const config = await getConfig();
-        sendResponse({ success: true, config });
+        const stored = await chrome.storage.local.get('proxyHealth');
+        sendResponse({ success: true, config, proxyHealth: stored.proxyHealth });
+      } else if (message.action === 'checkHealth') {
+        const health = await checkProxyHealth();
+        sendResponse({ success: true, health });
       } else if (message.action === 'toggleProxy') {
         const config = await getConfig();
         const newEnabled = !config.enabled;
@@ -245,7 +330,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({ success: true, enabled: newEnabled });
       } else if (message.action === 'reapply') {
         await applyProxySettings();
-        sendResponse({ success: true });
+        const health = await checkProxyHealth();
+        sendResponse({ success: true, health });
       } else {
         sendResponse({ success: false, error: 'Unknown action' });
       }

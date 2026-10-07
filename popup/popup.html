@@ -34,6 +34,37 @@
       <div id="proxyServerDisplay" class="status-endpoint">2.27.25.190:3128</div>
     </div>
 
+    <!-- Whitelist Warning Card (Shown when proxy rejects connection or IP not whitelisted) -->
+    <div id="whitelistCard" class="whitelist-card hidden">
+      <div class="whitelist-info">
+        <div class="whitelist-header">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="8" x2="12" y2="12"></line>
+            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+          </svg>
+          <span class="whitelist-title">IP NOT IN WHITELIST</span>
+        </div>
+        <p class="whitelist-desc">Proxy access is restricted. Add your IP via Telegram bot.</p>
+      </div>
+      <div class="whitelist-actions">
+        <a href="https://t.me/proxymokis_bot" target="_blank" class="btn-whitelist">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="22" y1="2" x2="11" y2="13"></line>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+          </svg>
+          <span>@proxymokis_bot</span>
+        </a>
+        <button type="button" id="recheckBtn" class="btn-recheck" title="Retry connection test">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="23 4 23 10 17 10"></polyline>
+            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+          </svg>
+          <span>Recheck</span>
+        </button>
+      </div>
+    </div>
+
     <!-- Quick Navigation Links -->
     <div class="quick-nav">
       <a href="https://gemini.google.com" target="_blank" class="nav-item">

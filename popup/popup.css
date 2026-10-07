@@ -214,6 +214,114 @@ input:checked + .switch-slider:before {
   color: var(--text-primary);
 }
 
+.status-blocked .status-dot {
+  background-color: #ef4444;
+}
+
+.status-blocked .status-label {
+  color: #f87171;
+}
+
+.status-checking .status-dot {
+  background-color: #eab308;
+}
+
+.status-checking .status-label {
+  color: #facc15;
+}
+
+/* Whitelist Warning Card */
+.whitelist-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 11px 12px;
+  border-radius: var(--r-md);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  background: rgba(35, 20, 20, 0.75);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  transition: var(--t);
+}
+
+.whitelist-card.hidden {
+  display: none;
+}
+
+.whitelist-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.whitelist-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #f87171;
+}
+
+.whitelist-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  font-family: var(--font-mono);
+}
+
+.whitelist-desc {
+  font-size: 11px;
+  color: var(--text-sec);
+  line-height: 1.35;
+}
+
+.whitelist-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-whitelist {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background-color: var(--accent);
+  color: var(--accent-fg);
+  border-radius: var(--r-sm);
+  padding: 6px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  text-decoration: none;
+  transition: var(--t);
+}
+
+.btn-whitelist:hover {
+  background-color: #e0e0e0;
+}
+
+.btn-recheck {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  background-color: transparent;
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 6px 10px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  cursor: pointer;
+  transition: var(--t);
+}
+
+.btn-recheck:hover {
+  background-color: rgba(45, 45, 45, 0.6);
+  border-color: var(--border-hover);
+}
+
 /* Quick Navigation */
 .quick-nav {
   display: grid;

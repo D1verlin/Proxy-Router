@@ -80,15 +80,16 @@ function showToast(message = 'Settings updated') {
 }
 
 /**
- * Updates the status banner UI.
+ * Updates the status banner UI and shows/hides whitelist alert.
  */
-function updateStatusBanner() {
+function updateStatusBanner(health = null) {
   const masterToggle = document.getElementById('masterToggle');
   const statusBanner = document.getElementById('statusBanner');
   const statusText = document.getElementById('statusText');
   const proxyServerDisplay = document.getElementById('proxyServerDisplay');
   const proxyHost = document.getElementById('proxyHost');
   const proxyPort = document.getElementById('proxyPort');
+  const whitelistCard = document.getElementById('whitelistCard');
 
   if (!statusBanner) return;
 
@@ -96,14 +97,56 @@ function updateStatusBanner() {
   const host = (proxyHost ? proxyHost.value.trim() : currentConfig.proxyHost) || '2.27.25.190';
   const port = (proxyPort ? proxyPort.value.trim() : currentConfig.proxyPort) || '3128';
 
-  if (isEnabled) {
-    statusBanner.className = 'status-card status-active';
-    if (statusText) statusText.textContent = 'ACTIVE';
-    if (proxyServerDisplay) proxyServerDisplay.textContent = `${host}:${port}`;
-  } else {
+  if (!isEnabled) {
     statusBanner.className = 'status-card';
     if (statusText) statusText.textContent = 'DISABLED';
     if (proxyServerDisplay) proxyServerDisplay.textContent = 'DIRECT';
+    if (whitelistCard) whitelistCard.classList.add('hidden');
+    return;
+  }
+
+  // Enabled mode: evaluate health status
+  const currentHealth = health || currentConfig.proxyHealth;
+
+  if (currentHealth && currentHealth.status === 'blocked') {
+    statusBanner.className = 'status-card status-blocked';
+    if (statusText) statusText.textContent = 'NOT WHITELISTED';
+    if (proxyServerDisplay) proxyServerDisplay.textContent = `${host}:${port}`;
+    if (whitelistCard) whitelistCard.classList.remove('hidden');
+  } else if (currentHealth && currentHealth.status === 'checking') {
+    statusBanner.className = 'status-card status-checking';
+    if (statusText) statusText.textContent = 'CHECKING...';
+    if (proxyServerDisplay) proxyServerDisplay.textContent = `${host}:${port}`;
+    if (whitelistCard) whitelistCard.classList.add('hidden');
+  } else {
+    statusBanner.className = 'status-card status-active';
+    if (statusText) statusText.textContent = 'ACTIVE';
+    if (proxyServerDisplay) proxyServerDisplay.textContent = `${host}:${port}`;
+    if (whitelistCard) whitelistCard.classList.add('hidden');
+  }
+}
+
+/**
+ * Triggers a live proxy connectivity and whitelist check.
+ */
+async function performHealthCheck() {
+  if (!currentConfig.enabled) {
+    updateStatusBanner({ status: 'disabled' });
+    return;
+  }
+
+  updateStatusBanner({ status: 'checking' });
+  try {
+    const resp = await chrome.runtime.sendMessage({ action: 'checkHealth' });
+    if (resp && resp.health) {
+      currentConfig.proxyHealth = resp.health;
+      updateStatusBanner(resp.health);
+    } else {
+      updateStatusBanner({ status: 'active' });
+    }
+  } catch (err) {
+    console.warn('Health check communication error:', err);
+    updateStatusBanner({ status: 'blocked', error: err.message });
   }
 }
 
@@ -199,8 +242,12 @@ async function init() {
     renderTagList('customDomainsList', currentConfig.customDomains, removeDomain);
     renderTagList('customExcludesList', currentConfig.customExcludes, removeExclude);
 
-    updateStatusBanner();
+    updateStatusBanner(currentConfig.proxyHealth);
     updateActiveTargetsCount();
+
+    if (currentConfig.enabled) {
+      performHealthCheck();
+    }
   } catch (error) {
     console.error('Failed to initialize popup:', error);
   }
@@ -227,6 +274,17 @@ function setupListeners() {
   // Master toggle
   safeListen('masterToggle', 'change', async (e) => {
     await saveConfig({ enabled: e.target.checked });
+    if (e.target.checked) {
+      performHealthCheck();
+    } else {
+      updateStatusBanner({ status: 'disabled' });
+    }
+  });
+
+  // Recheck button
+  safeListen('recheckBtn', 'click', async () => {
+    showToast('Checking connection...');
+    await performHealthCheck();
   });
 
   // Target presets
@@ -262,13 +320,17 @@ function setupListeners() {
   // Proxy Host & Port
   safeListen('proxyHost', 'change', async (e) => {
     const val = e.target.value.trim();
-    if (val) await saveConfig({ proxyHost: val });
+    if (val) {
+      await saveConfig({ proxyHost: val });
+      performHealthCheck();
+    }
   });
 
   safeListen('proxyPort', 'change', async (e) => {
     const val = parseInt(e.target.value.trim(), 10);
     if (val > 0 && val <= 65535) {
       await saveConfig({ proxyPort: val });
+      performHealthCheck();
     } else {
       e.target.value = currentConfig.proxyPort || 3128;
     }
