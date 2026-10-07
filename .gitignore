@@ -1,0 +1,17 @@
+# Operating System files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor & IDE settings
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Build & packaging artifacts
+*.crx
+*.zip
+
+# Agent / Tooling temporary files
+.agent/
