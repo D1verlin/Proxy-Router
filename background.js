@@ -181,11 +181,6 @@ async function applyProxySettings() {
         scope: 'regular'
       });
 
-      await chrome.action.setBadgeText({ text: 'ON' });
-      await chrome.action.setBadgeBackgroundColor({ color: '#222222' });
-      await chrome.action.setTitle({
-        title: `Proxy Router: Active (${config.proxyHost}:${config.proxyPort})`
-      });
       console.log('Smart Proxy: PAC script successfully applied.');
       
       // Perform health check asynchronously
@@ -212,7 +207,7 @@ async function applyProxySettings() {
 }
 
 /**
- * Updates proxy state to blocked.
+ * Updates proxy state to blocked (compact red dot).
  */
 async function markProxyBlocked(reason = 'Proxy Authentication Required (407)') {
   const result = {
@@ -221,16 +216,16 @@ async function markProxyBlocked(reason = 'Proxy Authentication Required (407)') 
     timestamp: Date.now()
   };
   await chrome.storage.local.set({ proxyHealth: result });
-  await chrome.action.setBadgeText({ text: 'ERR' });
-  await chrome.action.setBadgeBackgroundColor({ color: '#552222' });
+  await chrome.action.setBadgeText({ text: ' ' });
+  await chrome.action.setBadgeBackgroundColor({ color: '#ef4444' });
   await chrome.action.setTitle({
-    title: 'Proxy Router: IP Not Whitelisted'
+    title: `Proxy Router: Blocked (${reason})`
   });
   return result;
 }
 
 /**
- * Updates proxy state to active.
+ * Updates proxy state to active (compact green dot).
  */
 async function markProxyActive(ip, host, port) {
   const result = {
@@ -239,8 +234,8 @@ async function markProxyActive(ip, host, port) {
     timestamp: Date.now()
   };
   await chrome.storage.local.set({ proxyHealth: result });
-  await chrome.action.setBadgeText({ text: 'ON' });
-  await chrome.action.setBadgeBackgroundColor({ color: '#222222' });
+  await chrome.action.setBadgeText({ text: ' ' });
+  await chrome.action.setBadgeBackgroundColor({ color: '#10b981' });
   await chrome.action.setTitle({
     title: `Proxy Router: Active (${host}:${port})`
   });
@@ -380,14 +375,7 @@ chrome.webRequest.onAuthRequired.addListener(
 // Listen for proxy errors
 chrome.proxy.onProxyError.addListener(async (details) => {
   console.warn('Smart Proxy onProxyError:', details);
-  const result = {
-    status: 'blocked',
-    reason: details.error || 'Proxy Error',
-    timestamp: Date.now()
-  };
-  await chrome.storage.local.set({ proxyHealth: result });
-  await chrome.action.setBadgeText({ text: 'ERR' });
-  await chrome.action.setBadgeBackgroundColor({ color: '#552222' });
+  await markProxyBlocked(details.error || 'Proxy Error');
 });
 
 // Handle messages from popup UI

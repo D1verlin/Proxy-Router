@@ -185,7 +185,7 @@ input:checked + .switch-slider:before {
 }
 
 .status-active .status-dot {
-  background-color: #ffffff;
+  background-color: #10b981;
 }
 
 .status-label {
@@ -197,7 +197,7 @@ input:checked + .switch-slider:before {
 }
 
 .status-active .status-label {
-  color: var(--accent);
+  color: #10b981;
 }
 
 .status-endpoint {
