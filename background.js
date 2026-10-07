@@ -21,6 +21,24 @@ const DEFAULT_CONFIG = {
   fallbackToDirect: false
 };
 
+const ICONS = {
+  default: {
+    16: 'icons/icon16.png',
+    48: 'icons/icon48.png',
+    128: 'icons/icon128.png'
+  },
+  active: {
+    16: 'icons/active_16.png',
+    48: 'icons/active_48.png',
+    128: 'icons/active_128.png'
+  },
+  blocked: {
+    16: 'icons/blocked_16.png',
+    48: 'icons/blocked_48.png',
+    128: 'icons/blocked_128.png'
+  }
+};
+
 /**
  * Builds the PAC (Proxy Auto-Config) script based on the configuration.
  */
@@ -194,6 +212,7 @@ async function applyProxySettings() {
         scope: 'regular'
       });
 
+      await chrome.action.setIcon({ path: ICONS.default });
       await chrome.action.setBadgeText({ text: '' });
       await chrome.action.setTitle({
         title: 'Proxy Router: Disabled (direct connection)'
@@ -207,7 +226,7 @@ async function applyProxySettings() {
 }
 
 /**
- * Updates proxy state to blocked (compact red dot).
+ * Updates proxy state to blocked (round red dot icon).
  */
 async function markProxyBlocked(reason = 'Proxy Authentication Required (407)') {
   const result = {
@@ -216,8 +235,8 @@ async function markProxyBlocked(reason = 'Proxy Authentication Required (407)') 
     timestamp: Date.now()
   };
   await chrome.storage.local.set({ proxyHealth: result });
-  await chrome.action.setBadgeText({ text: ' ' });
-  await chrome.action.setBadgeBackgroundColor({ color: '#ef4444' });
+  await chrome.action.setIcon({ path: ICONS.blocked });
+  await chrome.action.setBadgeText({ text: '' });
   await chrome.action.setTitle({
     title: `Proxy Router: Blocked (${reason})`
   });
@@ -225,7 +244,7 @@ async function markProxyBlocked(reason = 'Proxy Authentication Required (407)') 
 }
 
 /**
- * Updates proxy state to active (compact green dot).
+ * Updates proxy state to active (round green dot icon).
  */
 async function markProxyActive(ip, host, port) {
   const result = {
@@ -234,8 +253,8 @@ async function markProxyActive(ip, host, port) {
     timestamp: Date.now()
   };
   await chrome.storage.local.set({ proxyHealth: result });
-  await chrome.action.setBadgeText({ text: ' ' });
-  await chrome.action.setBadgeBackgroundColor({ color: '#10b981' });
+  await chrome.action.setIcon({ path: ICONS.active });
+  await chrome.action.setBadgeText({ text: '' });
   await chrome.action.setTitle({
     title: `Proxy Router: Active (${host}:${port})`
   });
