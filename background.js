@@ -212,8 +212,45 @@ async function applyProxySettings() {
 }
 
 /**
- * Performs a health and whitelist check by verifying outbound IP through an endpoint
- * that is explicitly routed through the proxy in the PAC script.
+ * Updates proxy state to blocked.
+ */
+async function markProxyBlocked(reason = 'Proxy Authentication Required (407)') {
+  const result = {
+    status: 'blocked',
+    reason,
+    timestamp: Date.now()
+  };
+  await chrome.storage.local.set({ proxyHealth: result });
+  await chrome.action.setBadgeText({ text: 'ERR' });
+  await chrome.action.setBadgeBackgroundColor({ color: '#552222' });
+  await chrome.action.setTitle({
+    title: 'Proxy Router: IP Not Whitelisted'
+  });
+  return result;
+}
+
+/**
+ * Updates proxy state to active.
+ */
+async function markProxyActive(ip, host, port) {
+  const result = {
+    status: 'active',
+    ip,
+    timestamp: Date.now()
+  };
+  await chrome.storage.local.set({ proxyHealth: result });
+  await chrome.action.setBadgeText({ text: 'ON' });
+  await chrome.action.setBadgeBackgroundColor({ color: '#222222' });
+  await chrome.action.setTitle({
+    title: `Proxy Router: Active (${host}:${port})`
+  });
+  return result;
+}
+
+/**
+ * Performs a health and whitelist check.
+ * Flushes Chrome's internal bad-proxy retry penalty, probes the routed Google 204 endpoint,
+ * and confirms outbound proxy connectivity.
  */
 async function checkProxyHealth() {
   const config = await getConfig();
@@ -223,87 +260,79 @@ async function checkProxyHealth() {
     return res;
   }
 
+  // 1. Flush Chrome's internal ProxyRetryInfoMap so Chrome retries proxy immediately
+  await applyProxySettings();
+
   const expectedIp = (config.proxyHost || '2.27.25.190').trim();
 
-  // Helper function to query an IP echo service
-  async function queryIpEcho(url, timeoutMs = 4500) {
+  // Flag to detect if proxy auth challenge occurs during this probe
+  let authChallenged = false;
+  const tempListener = (details) => {
+    if (details.isProxy) authChallenged = true;
+  };
+  chrome.webRequest.onAuthRequired.addListener(tempListener, { urls: ['<all_urls>'] });
+
+  try {
+    // 2. Primary lightning-fast probe: http://google.com/generate_204 (routed via proxy in PAC script)
+    // If client IP is not whitelisted, Squid IMMEDIATELY responds with 407 (10-20ms).
+    // If client IP is whitelisted, Squid allows connection and returns 204 (30-50ms).
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const timer = setTimeout(() => controller.abort(), 2000);
+
+    const probeUrl = `http://google.com/generate_204?_t=${Date.now()}`;
+    let probeStatus = 0;
     try {
-      const resp = await fetch(url, {
+      const resp = await fetch(probeUrl, {
         method: 'GET',
         signal: controller.signal,
         cache: 'no-store'
       });
-      clearTimeout(timer);
-      if (!resp.ok) {
-        return { ok: false, error: `HTTP ${resp.status}`, status: resp.status };
-      }
-      const data = await resp.json();
-      const ip = (data && data.ip ? data.ip : '').trim();
-      return { ok: true, ip };
+      probeStatus = resp.status;
     } catch (err) {
+      // Squid 407 triggers onAuthRequired, which cancels request and fetch throws
+    } finally {
       clearTimeout(timer);
-      const isTimeout = err.name === 'AbortError';
-      return { ok: false, error: isTimeout ? 'Timeout' : (err.message || 'Network Error') };
     }
-  }
 
-  const cacheBust = Date.now();
-  // 1. Primary probe: api.ipify.org (routed strictly via proxy in PAC script)
-  let probe = await queryIpEcho(`https://api.ipify.org?format=json&_ts=${cacheBust}`, 4000);
-
-  // 2. Fallback probe: ipinfo.io (if primary encountered network error/timeout, but not 403/407)
-  if (!probe.ok && probe.error !== 'HTTP 403' && probe.error !== 'HTTP 407') {
-    probe = await queryIpEcho(`https://ipinfo.io/json?_ts=${cacheBust}`, 4000);
-  }
-
-  if (probe.ok && probe.ip) {
-    // If observed IP matches proxy IP, traffic is confirmed routed through proxy
-    if (probe.ip === expectedIp || probe.ip.startsWith(expectedIp)) {
-      const result = {
-        status: 'active',
-        ip: probe.ip,
-        timestamp: Date.now()
-      };
-      await chrome.storage.local.set({ proxyHealth: result });
-      await chrome.action.setBadgeText({ text: 'ON' });
-      await chrome.action.setBadgeBackgroundColor({ color: '#222222' });
-      await chrome.action.setTitle({
-        title: `Proxy Router: Active (${expectedIp}:${config.proxyPort})`
-      });
-      return result;
-    } else {
-      // Egress IP does not match the proxy! Proxy was bypassed or fell back to direct.
-      const result = {
-        status: 'blocked',
-        reason: `Direct connection detected (${probe.ip})`,
-        observedIp: probe.ip,
-        timestamp: Date.now()
-      };
-      await chrome.storage.local.set({ proxyHealth: result });
-      await chrome.action.setBadgeText({ text: 'ERR' });
-      await chrome.action.setBadgeBackgroundColor({ color: '#552222' });
-      await chrome.action.setTitle({
-        title: 'Proxy Router: IP Not Whitelisted'
-      });
-      return result;
+    if (authChallenged) {
+      chrome.webRequest.onAuthRequired.removeListener(tempListener);
+      return await markProxyBlocked('Proxy Authentication Required (407)');
     }
-  }
 
-  // Probe failed (Squid 403 Forbidden, 407 Auth Required, tunnel connection refused, or timeout)
-  const result = {
-    status: 'blocked',
-    reason: probe.error || 'Connection Failed',
-    timestamp: Date.now()
-  };
-  await chrome.storage.local.set({ proxyHealth: result });
-  await chrome.action.setBadgeText({ text: 'ERR' });
-  await chrome.action.setBadgeBackgroundColor({ color: '#552222' });
-  await chrome.action.setTitle({
-    title: 'Proxy Router: Connection Blocked / Whitelist Required'
-  });
-  return result;
+    if (probeStatus !== 204 && probeStatus !== 200) {
+      // Connection failed, refused, or 403
+      chrome.webRequest.onAuthRequired.removeListener(tempListener);
+      return await markProxyBlocked(probeStatus ? `HTTP ${probeStatus}` : 'Connection Failed');
+    }
+
+    // 3. Fast secondary verification of outbound egress IP via api.ipify.org
+    try {
+      const ipController = new AbortController();
+      const ipTimer = setTimeout(() => ipController.abort(), 2500);
+      const ipResp = await fetch(`https://api.ipify.org?format=json&_t=${Date.now()}`, {
+        method: 'GET',
+        signal: ipController.signal,
+        cache: 'no-store'
+      });
+      clearTimeout(ipTimer);
+      if (ipResp.ok) {
+        const data = await ipResp.json();
+        const observedIp = (data?.ip || '').trim();
+        if (observedIp && observedIp !== expectedIp && !observedIp.startsWith(expectedIp)) {
+          chrome.webRequest.onAuthRequired.removeListener(tempListener);
+          return await markProxyBlocked(`Direct IP detected (${observedIp})`);
+        }
+      }
+    } catch (e) {
+      // If ipify has TLS/timeout delay, but Google 204 succeeded without auth challenge, proxy is healthy
+    }
+
+    chrome.webRequest.onAuthRequired.removeListener(tempListener);
+    return await markProxyActive(expectedIp, expectedIp, config.proxyPort);
+  } catch (err) {
+    chrome.webRequest.onAuthRequired.removeListener(tempListener);
+    return await markProxyBlocked(err.message || 'Connection Error');
+  }
 }
 
 // Extension installation or update
@@ -339,18 +368,7 @@ chrome.webRequest.onAuthRequired.addListener(
   (details) => {
     if (details.isProxy) {
       console.warn('Smart Proxy: Auth challenge detected (IP not in whitelist):', details);
-      const result = {
-        status: 'blocked',
-        reason: 'Proxy Authentication Required (407)',
-        timestamp: Date.now()
-      };
-      chrome.storage.local.set({ proxyHealth: result });
-      chrome.action.setBadgeText({ text: 'ERR' });
-      chrome.action.setBadgeBackgroundColor({ color: '#552222' });
-      chrome.action.setTitle({
-        title: 'Proxy Router: IP Not Whitelisted'
-      });
-
+      markProxyBlocked('Proxy Authentication Required (407)');
       // Cancel challenge to completely suppress Chrome's login/password prompt!
       return { cancel: true };
     }
