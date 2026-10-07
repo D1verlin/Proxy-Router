@@ -253,19 +253,9 @@ async function checkProxyHealth() {
   // 1. Primary probe: api.ipify.org (routed strictly via proxy in PAC script)
   let probe = await queryIpEcho(`https://api.ipify.org?format=json&_ts=${cacheBust}`, 4000);
 
-  // Check if onAuthRequired or onProxyError flagged proxy as blocked during probe
-  const stored = await chrome.storage.local.get('proxyHealth');
-  if (stored.proxyHealth && stored.proxyHealth.status === 'blocked') {
-    return stored.proxyHealth;
-  }
-
   // 2. Fallback probe: ipinfo.io (if primary encountered network error/timeout, but not 403/407)
   if (!probe.ok && probe.error !== 'HTTP 403' && probe.error !== 'HTTP 407') {
     probe = await queryIpEcho(`https://ipinfo.io/json?_ts=${cacheBust}`, 4000);
-    const storedAfter = await chrome.storage.local.get('proxyHealth');
-    if (storedAfter.proxyHealth && storedAfter.proxyHealth.status === 'blocked') {
-      return storedAfter.proxyHealth;
-    }
   }
 
   if (probe.ok && probe.ip) {

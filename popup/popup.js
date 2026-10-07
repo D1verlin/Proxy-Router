@@ -261,11 +261,15 @@ async function init() {
     renderTagList('customDomainsList', currentConfig.customDomains, removeDomain);
     renderTagList('customExcludesList', currentConfig.customExcludes, removeExclude);
 
-    updateStatusBanner(currentConfig.proxyHealth);
+    if (!currentConfig.enabled) {
+      updateStatusBanner({ status: 'disabled' });
+    } else {
+      updateStatusBanner({ status: 'checking' });
+    }
     updateActiveTargetsCount();
 
     if (currentConfig.enabled) {
-      performHealthCheck();
+      performHealthCheck(false);
     }
   } catch (error) {
     console.error('Failed to initialize popup:', error);
