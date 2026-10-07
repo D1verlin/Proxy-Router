@@ -315,7 +315,12 @@ function setupListeners() {
 }
 
 // Bootstrap
-document.addEventListener('DOMContentLoaded', async () => {
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => {
+    setupListeners();
+    init();
+  });
+} else {
   setupListeners();
-  await init();
-});
+  init();
+}
